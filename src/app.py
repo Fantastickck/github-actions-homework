@@ -1,5 +1,8 @@
+from datetime import datetime
+import json
 from flask import Flask
 from flask import request, jsonify
+from pydantic import BaseModel, ValidationError
 
 app = Flask(__name__)
 
@@ -44,6 +47,39 @@ def api():
             return jsonify({'status': 'OK'})
         else:
             return jsonify({'status': 'bad input'}), 400
+
+
+class CreateTransactionRequest(BaseModel):
+    amount: float
+    payer: str
+    recipient: str
+
+
+TRANSACTIONS_PATH = 'src/data.json'
+    
+
+@app.route('/transactions/', methods=['GET', 'POST'])
+def transactions():
+    with open(TRANSACTIONS_PATH) as f:
+        transactions: list = json.load(f)
+
+    if request.method == 'GET':
+        return jsonify(transactions)
+    elif request.method == 'POST':
+        try:
+            request_data = CreateTransactionRequest.model_validate(request.json)
+        except ValidationError as e:
+            return jsonify({'message': f'Ошибка валидации: {e}'}), 400
+
+        create_data = {
+            **request_data.model_dump(),
+            'created_at': datetime.now().isoformat()
+        }
+        transactions.append(create_data)
+        with open(TRANSACTIONS_PATH, 'w') as f:
+            json.dump(transactions, f)
+        return jsonify({'message': 'Транзакция успешно добавлена'})
+
 
 def main():
     app.run(host='0.0.0.0', port=8080)

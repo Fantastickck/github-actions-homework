@@ -12,6 +12,11 @@ class FlaskAppTests(unittest.TestCase):
     def setUp(self):
         tested_app.app.config['TESTING'] = True
         self.app = tested_app.app.test_client()
+    
+    def tearDown(self):
+        super().tearDown()
+        with open('src/data.json', 'w') as f:
+            json.dump([], f)
 
     def test_get_hello_endpoint(self):
         r = self.app.get('/')
@@ -63,6 +68,34 @@ class FlaskAppTests(unittest.TestCase):
         r = self.app.get('/add?a=2&b=3')
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.data, b'5.0')
+    
+    def test_add_transaction_validation_error(self):
+        create_data = {
+            'amount': 500.0,
+            'payer': 121314324142,
+            'recipient': '3333333333233',
+        }
+
+        response = self.app.post('/transactions/', content_type='application/json', data=json.dumps(create_data))
+
+        self.assertEqual(response.status_code, 400)
+    
+    def test_add_transaction_success(self):
+        create_data = {
+            'amount': 500.0,
+            'payer': '121314324142',
+            'recipient': '3333333333',
+        }
+
+        response = self.app.post('/transactions/', content_type='application/json', data=json.dumps(create_data))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {'message': 'Транзакция успешно добавлена'})
+
+        response_list = self.app.get('/transactions/')
+        self.assertEqual(response_list.status_code, 200)
+        self.assertEqual(len(response_list.json), 1)
+
 ##
 ###
 if __name__ == '__main__':
